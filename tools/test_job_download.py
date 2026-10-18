@@ -1,10 +1,12 @@
 """Offline archive download integrity tests; no GitHub requests or real tokens."""
 import contextlib
 import http.client
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import importlib.util
 import io
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -81,6 +83,72 @@ class DownloadIntegrityTests(unittest.TestCase):
             self.fetch(root, io.BytesIO(b"complete archive"))
             self.assertEqual((root / "result/results.zip").read_bytes(), b"complete archive")
             self.assertEqual([p.name for p in (root / "result").iterdir()], ["results.zip"])
+
+
+class DownloadRedirectTests(unittest.TestCase):
+    def fetch_archive(self, redirects):
+        observed = []
+        routes = {}
+        archive = b"complete fixture archive"
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append((self.path, self.headers.get("Authorization")))
+                target = routes.get(self.path)
+                self.send_response(302 if target else 200)
+                if target:
+                    self.send_header("Location", target)
+                self.end_headers()
+                if not target:
+                    self.wfile.write(archive)
+
+            def log_message(self, *args):
+                pass
+
+        servers = [HTTPServer(("127.0.0.1", 0), Handler) for _ in range(2)]
+        origin = "http://127.0.0.1:{}".format(servers[0].server_port)
+        storage = "http://127.0.0.1:{}".format(servers[1].server_port)
+        if redirects:
+            routes["/archive"] = storage + "/blob"
+        if redirects == 2:
+            routes["/archive"] = origin + "/intermediate"
+            routes["/intermediate"] = storage + "/blob"
+        threads = [threading.Thread(target=s.serve_forever, daemon=True) for s in servers]
+        for thread in threads:
+            thread.start()
+        try:
+            # Exercise urllib's real redirect handling, without environment
+            # proxies, live GitHub requests, or reading the user's credentials.
+            opener = job.urllib.request.build_opener(job.urllib.request.ProxyHandler({}))
+            artifact = {"name": "results", "archive_download_url": origin + "/archive",
+                        "size_in_bytes": len(archive)}
+            with tempfile.TemporaryDirectory() as tmp, \
+                 mock.patch.object(job, "gh_api", return_value={"artifacts": [artifact]}), \
+                 mock.patch.object(job, "gh_token", return_value="offline-fixture"), \
+                 mock.patch.object(job.urllib.request, "urlopen",
+                                   side_effect=lambda req, timeout: opener.open(req, timeout=3)), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(job.actions_fetch(123, tmp), 0)
+                self.assertEqual((Path(tmp) / "result/results.zip").read_bytes(), archive)
+        finally:
+            for server in servers:
+                server.shutdown()
+                server.server_close()
+            for thread in threads:
+                thread.join(timeout=3)
+        return observed
+
+    def test_direct_download_keeps_initial_authentication(self):
+        self.assertEqual(self.fetch_archive(0), [("/archive", "token offline-fixture")])
+
+    def test_cross_origin_redirect_does_not_forward_authentication(self):
+        self.assertEqual(self.fetch_archive(1),
+                         [("/archive", "token offline-fixture"), ("/blob", None)])
+
+    def test_redirect_chain_does_not_restore_authentication(self):
+        self.assertEqual(self.fetch_archive(2),
+                         [("/archive", "token offline-fixture"),
+                          ("/intermediate", None), ("/blob", None)])
 
 
 if __name__ == "__main__":

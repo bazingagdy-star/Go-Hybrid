@@ -1,4 +1,5 @@
 # STATUS (for the human — 15 lines max)
+- 2026-10-18 contribution: artifact download auth stays on the initial API request. Offline loopback redirect tests reproduce 2 baseline failures; fixed download tests 7/7, registration guard and diff check pass. No live credentials, remote downloads, or full compiler/CI validation.
 
 - Phase: **MVP DONE + v0.1.0 released + community OPEN** — session-21: old-wave recons + wave triage #248–#336 + const-stack all CONSUMED (24 PRs landed, 7 credit closes, 3 issues verified closed) — cargo 1143/0 (63 binaries), corpus 79/79, differential FULL (23+56), main CI green (28754ab)
 - **M1 VERDICTS: all 21 drafts DONE** (`VERDICTS-M1-DRAFT.md` — maintainer copy): 9 ACCEPTED, 4 CONDITIONAL, 5 DECLINED w/ learnings, 2 DEFERRED, 1 ACCEPTED-AS-LEARNING — post to #365 on 2026-11-01 per the file's checklist; W-015 spike #379 mergeable+green awaiting the window

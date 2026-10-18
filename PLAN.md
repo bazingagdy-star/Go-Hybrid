@@ -229,6 +229,9 @@ All SPEC §3 rows verified — see research/claims.md. Headlines: rustygo 127/14
 - Six offline CLI regressions: baseline **1 passed / 5 failed**; patched **6/6 passed**. Fixtures compare content hashes, mtimes, and modes before/after check mode; generation still restores all five outputs. The actual workload check and `git diff --check` pass.
 - Full pinned Go/Rust suites were not run: those toolchains are unavailable locally. This base also has pre-existing CI YAML and Makefile indentation defects tracked by PRs #172/#199; their fixes and upstream CI are still needed. No compiler or runtime behavior is changed or claimed.
 
+## Contributor validation: artifact download authentication (2026-10-18)
+- Actions artifact download authentication: base `0ca08c2` forwards the GitHub Authorization header through the artifact API's 302 redirect. Limit it to the initial request with `add_unredirected_header`; signed storage URLs do not need the API credential. Three new offline tests exercise real urllib and loopback HTTP endpoints: baseline direct download passes, cross-origin and chained redirects fail; patched download suite 7/7 and existing job CLI suite 30/30 pass. Existing archive integrity and publication checks remain green; registration guard and `git diff --check` pass. Fake credentials only, no GitHub/Kaggle download or Go/Rust compiler suite run; upstream CI remains required.
+
 ## Cut Log
 - 2026-10-13 | Per-callee fast-path stack budgets (widening fast-path eligibility below the 4096 B guard for tiny bounded callees on shallow stacks) | would shave the shallow-goroutine deep-path cost (~19 ns) for small callees | revisit if a workload shows steady-state shallow-stack crossings dominating; needs a descriptor + generator change + Decision Log entry (gates/G2.md follow-up #2)
 

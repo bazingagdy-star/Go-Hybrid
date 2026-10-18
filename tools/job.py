@@ -292,7 +292,8 @@ def actions_fetch(run_id, jobdir):
         url = a["archive_download_url"]
         dest = os.path.join(jobdir, "result", a["name"] + ".zip")
         req = urllib.request.Request(url)
-        req.add_header("Authorization", "token " + tok)
+        # GitHub redirects to a signed storage URL; authenticate only the API request.
+        req.add_unredirected_header("Authorization", "token " + tok)
         # Finish the response before touching a previous valid archive. Publish
         # via a sibling temporary file so write/replace failures preserve it too.
         with urllib.request.urlopen(req, timeout=120) as r:
