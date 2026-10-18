@@ -105,7 +105,10 @@ class DownloadRedirectTests(unittest.TestCase):
             def log_message(self, *args):
                 pass
 
-        servers = [HTTPServer(("127.0.0.1", 0), Handler) for _ in range(2)]
+        # HTTPServer names itself via reverse DNS, which is unrelated to this
+        # loopback fixture and can block before the request timeout starts.
+        with mock.patch("http.server.socket.getfqdn", return_value="localhost"):
+            servers = [HTTPServer(("127.0.0.1", 0), Handler) for _ in range(2)]
         origin = "http://127.0.0.1:{}".format(servers[0].server_port)
         storage = "http://127.0.0.1:{}".format(servers[1].server_port)
         if redirects:
